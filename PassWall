@@ -1,37 +1,201 @@
-# Install PassWall2 on OpenWrt
-# Router: Google Wi-Fi
-# OpenWrt Version: 23.05.2 r23630-842932a63d stable
-# GitHub repo: https://github.com/Ramtiiin/install-passwall2-openwrt
-# ------------------------------------------
-# ------------------------------------------
-# ------------------------------------------
+cat > /install_pw.sh << 'EOF'
+#!/bin/sh
+# PassWall2 Installer
 
-# 1. Initial Settings
-## IP Address, Wi-Fi, and Password (How? https://youtu.be/m-BAyaHNlV8)
-# ------------------------------------------
+# Colors
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# 2- install PassWall2
+# Logo
+echo ""
+echo "${BLUE}╔══════════════════════════╗${NC}"
+echo "${BLUE}║        WELCOME BACK      ║${NC}"
+echo "${BLUE}║         @KOP3MA          ║${NC}"
+echo "${BLUE}╚══════════════════════════╝${NC}"
+echo ""
+echo "${YELLOW}                 K   K   OOO   PPPP   3   M   M   AAA${NC}"
+echo "${YELLOW}                 K  K   O   O  P   P  3   MM MM  A   A${NC}"
+echo "${YELLOW}                 KKK    O   O  PPPP   3   M M M  AAAAA${NC}"
+echo "${YELLOW}                 K  K   O   O  P      3   M   M  A   A${NC}"
+echo "${YELLOW}                 K   K   OOO   P     333  M   M  A   A${NC}"
+echo ""
 
-ssh root@192.168.123.1 (Your Router's IP)
+echo "${RED}=====================================================${NC}"
+echo "${RED}        PASSWALL2 INSTALLATION FOR OPENWRT${NC}"
+echo "${RED}=====================================================${NC}"
+echo ""
+
+echo "${YELLOW}⚠️  WARNING: This will modify your router configuration${NC}"
+echo ""
+
+# Ask for confirmation
+echo "${BLUE}Do you want to start the installation?${NC}"
+printf "${YELLOW}Type 'YES' to continue: ${NC}"
+read confirmation
+
+if [ "$confirmation" != "YES" ]; then
+    echo "${RED}Installation cancelled.${NC}"
+    exit 1
+fi
+
+echo ""
+echo "${GREEN}Starting installation...${NC}"
+echo ""
+
+# ========================================
+# STEP 1: Update
+# ========================================
+echo "${BLUE}[STEP 1/8]${NC} Updating package lists..."
 opkg update
-opkg remove dnsmasq
+if [ $? -eq 0 ]; then
+    echo "${GREEN}[OK]${NC} Package lists updated"
+else
+    echo "${RED}[FAIL]${NC} Failed to update packages"
+    exit 1
+fi
+echo "±±"
+read -p "Press Enter to continue... " dummy
+
+# ========================================
+# STEP 2: Replace dnsmasq
+# ========================================
+echo ""
+echo "${BLUE}[STEP 2/8]${NC} Replacing dnsmasq with dnsmasq-full..."
+opkg remove dnsmasq --force-removal-of-dependent-packages 2>/dev/null
 opkg install dnsmasq-full
+if [ $? -eq 0 ]; then
+    echo "${GREEN}[OK]${NC} dnsmasq-full installed"
+else
+    echo "${RED}[FAIL]${NC} Failed to install dnsmasq-full"
+    exit 1
+fi
+echo "±±"
+read -p "Press Enter to continue... " dummy
+
+# ========================================
+# STEP 3: Kernel modules
+# ========================================
+echo ""
+echo "${BLUE}[STEP 3/8]${NC} Installing kernel modules..."
 opkg install kmod-nft-tproxy kmod-nft-socket
-wget -O passwall.pub https://master.dl.sourceforge.net/project/openwrt-passwall-build/passwall.pub
-opkg-key add passwall.pub
+if [ $? -eq 0 ]; then
+    echo "${GREEN}[OK]${NC} Kernel modules installed"
+else
+    echo "${RED}[FAIL]${NC} Failed to install kernel modules"
+    exit 1
+fi
+echo "±±"
+read -p "Press Enter to continue... " dummy
 
-##
-read release arch << EOF
-$(. /etc/openwrt_release ; echo ${DISTRIB_RELEASE%.*} $DISTRIB_ARCH)
-EOF
-for feed in passwall_packages passwall2; do
-  echo "src/gz $feed https://master.dl.sourceforge.net/project/openwrt-passwall-build/releases/packages-$release/$arch/$feed" >> /etc/opkg/customfeeds.conf
-done
-##
+# ========================================
+# STEP 4: Repository key
+# ========================================
+echo ""
+echo "${BLUE}[STEP 4/8]${NC} Adding PassWall2 repository key..."
+wget -O /tmp/passwall.pub https://master.dl.sourceforge.net/project/openwrt-passwall-build/passwall.pub
+opkg-key add /tmp/passwall.pub
+rm -f /tmp/passwall.pub
+if [ $? -eq 0 ]; then
+    echo "${GREEN}[OK]${NC} Repository key added"
+else
+    echo "${RED}[FAIL]${NC} Failed to add repository key"
+    exit 1
+fi
+echo "±±"
+read -p "Press Enter to continue... " dummy
 
+# ========================================
+# STEP 5: Add repositories
+# ========================================
+echo ""
+echo "${BLUE}[STEP 5/8]${NC} Adding PassWall2 repositories..."
+
+# Detect OpenWrt version and architecture
+RELEASE=$(cat /etc/openwrt_release | grep DISTRIB_RELEASE | cut -d "'" -f 2 | cut -d '.' -f 1)
+ARCH=$(cat /etc/openwrt_release | grep DISTRIB_ARCH | cut -d "'" -f 2)
+
+echo "${YELLOW}Detected: OpenWrt $RELEASE, Architecture: $ARCH${NC}"
+
+# Add repositories
+cat >> /etc/opkg/customfeeds.conf << ADDREPO
+src/gz passwall_packages https://master.dl.sourceforge.net/project/openwrt-passwall-build/releases/packages-$RELEASE/$ARCH/passwall_packages
+src/gz passwall2 https://master.dl.sourceforge.net/project/openwrt-passwall-build/releases/packages-$RELEASE/$ARCH/passwall2
+ADDREPO
+
+if [ $? -eq 0 ]; then
+    echo "${GREEN}[OK]${NC} Repositories added"
+else
+    echo "${RED}[FAIL]${NC} Failed to add repositories"
+    exit 1
+fi
+echo "±±"
+read -p "Press Enter to continue... " dummy
+
+# ========================================
+# STEP 6: Update with new repos
+# ========================================
+echo ""
+echo "${BLUE}[STEP 6/8]${NC} Updating packages with new repositories..."
 opkg update
-opkg install luci-app-passwall2 v2ray-geosite-ir
+if [ $? -eq 0 ]; then
+    echo "${GREEN}[OK]${NC} Package lists updated"
+else
+    echo "${RED}[FAIL]${NC} Failed to update packages"
+    exit 1
+fi
+echo "±±"
+read -p "Press Enter to continue... " dummy
 
---------------------------------------------
-# Video Link: https://youtu.be/m-BAyaHNlV8
------------------------------------------
+# ========================================
+# STEP 7: Install PassWall2
+# ========================================
+echo ""
+echo "${BLUE}[STEP 7/8]${NC} Installing PassWall2..."
+opkg install luci-app-passwall2 v2ray-geosite-ir
+if [ $? -eq 0 ]; then
+    echo "${GREEN}[OK]${NC} PassWall2 installed successfully"
+else
+    echo "${RED}[FAIL]${NC} Failed to install PassWall2"
+    exit 1
+fi
+echo "±±"
+read -p "Press Enter to continue... " dummy
+
+# ========================================
+# STEP 8: Final configuration
+# ========================================
+echo ""
+echo "${BLUE}[STEP 8/8]${NC} Final configuration..."
+/etc/init.d/dnsmasq restart
+/etc/init.d/dnsmasq enable
+if [ $? -eq 0 ]; then
+    echo "${GREEN}[OK]${NC} DNSMASQ service configured"
+else
+    echo "${RED}[FAIL]${NC} Failed to configure services"
+    exit 1
+fi
+echo "±±"
+
+# ========================================
+# COMPLETION
+# ========================================
+echo ""
+echo "${GREEN}========================================${NC}"
+echo "${GREEN}✅ INSTALLATION COMPLETED SUCCESSFULLY!${NC}"
+echo "${GREEN}========================================${NC}"
+echo ""
+echo "${YELLOW}Next steps:${NC}"
+echo "1. Open browser and go to your router IP"
+echo "2. Login to OpenWrt web interface"
+echo "3. Go to: Services → PassWall2"
+echo "4. Configure your proxy settings"
+echo ""
+echo "${GREEN}Installation finished!${NC}"
+echo ""
+EOF
+
+chmod +x /install_pw.sh
+sh /install_pw.sh
