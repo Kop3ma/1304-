@@ -3,7 +3,6 @@
 import os
 import subprocess
 import sys
-import time
 import zipfile
 import re
 
@@ -21,7 +20,8 @@ PYTHON_PACKAGES = [
     "beautifulsoup4",
     "pytz",
     "jdatetime",
-    "urllib3"
+    "urllib3",
+    "gdown"  # اضافه شد
 ]
 
 # =======================
@@ -29,13 +29,16 @@ PYTHON_PACKAGES = [
 # =======================
 def print_logo():
     print("""
-██  ██  ███   ██████  ██████  ███  ███
-█ █ █ █ █ █  █      █ █      █ █  █ █
-█  █  █ ███  █  ██  █ █  ██  █  █ ███
-█     █ █ █  █   ██ █ █   ██ █     █ █
-█     █ █ █   ██████  ██████ █     █ █
+╔══════════════════════════╗
+║        WELCOME BACK      ║
+║         @KOP3MA          ║
+╚══════════════════════════╝
 
-            KOP3MA
+                 K   K   OOO   PPPP   3   M   M   AAA
+                 K  K   O   O  P   P  3   MM MM  A   A
+                 KKK    O   O  PPPP   3   M M M  AAAAA
+                 K  K   O   O  P      3   M   M  A   A
+                 K   K   OOO   P     333  M   M  A   A
 """)
 
 def pause():
@@ -58,84 +61,7 @@ def run_command(cmd_list, show_output=True):
         return False
 
 # =======================
-# 🟢 Option 1: Download project from Google Drive
-# =======================
-def download_project():
-    print_logo()
-    print("="*60)
-    print("📥 Download project from Google Drive")
-    print("="*60)
-    indented_print("Enter File ID or full Google Drive link:")
-    user_input = input("    > ").strip()
-
-    if not user_input:
-        indented_print("No File ID or link entered!", prefix="=>>> ❌ ")
-        pause()
-        return
-
-    user_input = user_input.strip().lstrip('/').strip()
-
-    file_id = None
-
-    # استخراج File ID
-    patterns = [
-        r'([a-zA-Z0-9_-]{33})',                     # ID خام
-        r'/d/([a-zA-Z0-9_-]{33})(?:/|\?|$)',        # /d/ID/
-        r'file/d/([a-zA-Z0-9_-]{33})',              # file/d/ID
-        r'id=([a-zA-Z0-9_-]{33})',                  # id=ID
-        r'uc\?[^"]*id=([a-zA-Z0-9_-]{33})',         # uc?id=...
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, user_input, re.IGNORECASE)
-        if match:
-            file_id = match.group(1)
-            break
-
-    if not file_id:
-        indented_print("Could not extract valid File ID.", prefix="=>>> ❌ ")
-        indented_print("Examples:")
-        indented_print(" - 1k1TS7j5jv05xo_mBqU1kitYPyOIJDkJv")
-        indented_print(" - https://drive.google.com/file/d/1k1TS7j5jv05xo_mBqU1kitYPyOIJDkJv/view")
-        pause()
-        return
-
-    indented_print(f"Using File ID: {file_id}")
-
-    file_path = os.path.join(PROJECT_DIR, "project.zip")
-    if not os.path.exists(PROJECT_DIR):
-        os.makedirs(PROJECT_DIR, exist_ok=True)
-
-    print("🔄 Downloading...")
-    # استفاده از confirm=t برای دور زدن ویروس اسکن گوگل
-    gdrive_url = f"https://drive.google.com/uc?export=download&confirm=t&id={file_id}"
-    ret = run_command(["wget", "-O", file_path, "--no-check-certificate", gdrive_url])
-    if ret:
-        print(f"✅ Download completed: {file_path}")
-    else:
-        print("❌ Download failed - check if file is 'Anyone with the link'")
-        pause()
-        return
-
-    print("🗜 Extracting...")
-    try:
-        if file_path.lower().endswith(".zip"):
-            with zipfile.ZipFile(file_path, 'r') as zip_ref:
-                zip_ref.extractall(PROJECT_DIR)
-            print("✅ Extraction complete")
-        else:
-            print("⚠️ Not a zip file")
-    except Exception as e:
-        print(f"❌ Extraction failed: {e}")
-
-    if os.path.exists(file_path):
-        os.remove(file_path)
-        print("🗑 Downloaded file removed")
-
-    pause()
-
-# =======================
-# 🟢 Option 2: Install Python packages
+# 🟢 Option 1: Install Python packages
 # =======================
 def install_packages():
     print_logo()
@@ -150,6 +76,114 @@ def install_packages():
         print(f"📦 Installing {pkg} ...")
         run_command(["pip3", "install", "--no-cache-dir", "--timeout", "120", "--retries", "10", pkg])
     print("✅ All packages installed")
+    pause()
+
+# =======================
+# 🟢 Option 2: Download project from Google Drive
+# =======================
+def download_project():
+    print_logo()
+    print("="*60)
+    print("📥 Download project from Google Drive")
+    print("="*60)
+    
+    # اول چک کنیم gdown نصب هست یا نه
+    try:
+        import gdown
+    except ImportError:
+        print("❌ gdown not installed! Run Option 1 first.")
+        pause()
+        return
+    
+    # گرفتن لینک
+    print("\n📎 Enter Google Drive link or File ID:")
+    print("Example: https://drive.google.com/file/d/ABC123/view")
+    print("Or just: ABC123")
+    url_input = input("> ").strip()
+    
+    if not url_input:
+        print("❌ No input!")
+        pause()
+        return
+    
+    # استخراج File ID
+    file_id = None
+    patterns = [
+        r'([a-zA-Z0-9_-]{33})',
+        r'/d/([a-zA-Z0-9_-]{33})',
+        r'id=([a-zA-Z0-9_-]{33})',
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, url_input)
+        if match:
+            file_id = match.group(1)
+            break
+    
+    if not file_id:
+        print("❌ Could not find File ID")
+        pause()
+        return
+    
+    print(f"✅ File ID: {file_id}")
+    
+    # دانلود در مسیر فعلی
+    current_dir = os.getcwd()
+    zip_file = os.path.join(current_dir, "project.zip")
+    
+    print(f"\n📂 Downloading to: {current_dir}")
+    print("⏳ Please wait...")
+    
+    try:
+        # دانلود با gdown
+        gdrive_url = f"https://drive.google.com/uc?id={file_id}"
+        downloaded = gdown.download(gdrive_url, output=zip_file, quiet=False)
+        
+        if not os.path.exists(zip_file):
+            print("❌ Download failed!")
+            pause()
+            return
+        
+        file_size = os.path.getsize(zip_file) / (1024*1024)
+        print(f"✅ Downloaded: {os.path.basename(zip_file)} ({file_size:.2f} MB)")
+        
+        # سوال برای مسیر اکسترکت
+        print("\n📁 Where to extract files?")
+        print("Press Enter to extract here")
+        extract_path = input("Extract to: ").strip()
+        
+        if not extract_path:
+            extract_path = current_dir  # انتر = همینجا
+        
+        # ایجاد پوشه اگر لازم باشه
+        if not os.path.exists(extract_path):
+            os.makedirs(extract_path, exist_ok=True)
+            print(f"📁 Created folder: {extract_path}")
+        
+        # اکسترکت
+        print(f"\n🗜 Extracting to: {extract_path}")
+        try:
+            with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+                file_count = len(zip_ref.namelist())
+                zip_ref.extractall(extract_path)
+                print(f"✅ Extracted {file_count} files")
+        except Exception as e:
+            print(f"❌ Extract error: {e}")
+        
+        # سوال برای حذف
+        print("\n🗑 Delete the ZIP file?")
+        print("Press Enter for YES, type 'n' for NO")
+        delete_choice = input("Delete? (Enter=Yes, n=No): ").strip().lower()
+        
+        if delete_choice == '' or delete_choice == 'y' or delete_choice == 'yes':
+            os.remove(zip_file)
+            print("✅ ZIP file deleted")
+        else:
+            print("⚠️ ZIP file kept")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+    
     pause()
 
 # =======================
@@ -286,8 +320,8 @@ def main_menu():
     while True:
         print_logo()
         print("="*60)
-        indented_print("1  Download project from Google Drive")
-        indented_print("2  Install Python packages")
+        indented_print("1  Install Python packages")
+        indented_print("2  Download project from Google Drive")
         indented_print("3  Create init.d service & start")
         indented_print("4  Manage Python service")
         indented_print("5  List & kill Python processes")
@@ -295,9 +329,9 @@ def main_menu():
         indented_print("0  Exit")
         choice = input("    Select an option: ").strip()
         if choice == "1":
-            download_project()
-        elif choice == "2":
             install_packages()
+        elif choice == "2":
+            download_project()
         elif choice == "3":
             create_init_service()
         elif choice == "4":
